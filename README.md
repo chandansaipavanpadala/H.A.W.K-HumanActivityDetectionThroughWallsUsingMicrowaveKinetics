@@ -23,41 +23,41 @@ Covert perimeter monitoring and intrusion detection in zero-visibility environme
 
 ## Hardware Architecture
 
-- **Microcontroller:** ESP32 Development Board (32-bit, Dual-Core)
-- **Radar Sensor:** HB100 / CDM324 Microwave Doppler Radar Module (10.525 GHz / 24 GHz)
-- **Signal Conditioning:** Custom Active Bandpass Filter (Op-Amp based) tuned to 0.1 Hz – 3.0 Hz to isolate human vitals and eliminate high-frequency mechanical noise.
-- **Output Interface:** OLED Display, Active Buzzer, and LED indicators.
+* **Microcontroller:** ESP32 Development Board (32-bit, Dual-Core)
+* **Radar Sensor:** HB100 / CDM324 Microwave Doppler Radar Module (10.525 GHz / 24 GHz)
+* **Signal Conditioning:** Custom Active Bandpass Filter (Op-Amp based) tuned to 0.1 Hz – 3.0 Hz to isolate human vitals and eliminate high-frequency mechanical noise.
+* **Output Interface:** OLED Display, Active Buzzer, and LED indicators.
 
 ## FreeRTOS Software Architecture
 
 The system abandons standard sequential loops in favor of a Preemptive Priority-Based RTOS scheduler. The workload is distributed across four distinct, concurrent tasks:
 
 ### 1. Radar Acquisition Task (Priority 4 - Highest)
-- Samples the analog radar signal at a strict, deterministic **250 Hz** using `vTaskDelayUntil()`.
-- Pushes raw **12-bit ADC data** to the processing queue non-blockingly.
+* Samples the analog radar signal at a strict, deterministic **250 Hz** using `vTaskDelayUntil()`.
+* Pushes raw **12-bit ADC data** to the processing queue non-blockingly.
 
 ### 2. Signal Processing Task (Priority 3)
-- Accumulates data arrays and utilizes the **arduinoFFT** library to perform Fast Fourier Transforms.
-- Applies **DC removal and Hamming windowing** to extract dominant micro-motion frequencies.
+* Accumulates data arrays and utilizes the **arduinoFFT** library to perform Fast Fourier Transforms.
+* Applies **DC removal and Hamming windowing** to extract dominant micro-motion frequencies.
 
 ### 3. Detection and Decision Task (Priority 2)
-- Evaluates FFT output against physiological thresholds **(0.1 - 3.0 Hz)**.
-- Utilizes a continuous **Confidence Level algorithm** to require multiple consecutive positive readings, effectively mitigating false positives.
+* Evaluates FFT output against physiological thresholds **(0.1 - 3.0 Hz)**.
+* Utilizes a continuous **Confidence Level algorithm** to require multiple consecutive positive readings, effectively mitigating false positives.
 
 ### 4. Communication and UI Task (Priority 1 - Lowest)
-- Blocks safely on a **FreeRTOS Semaphore** until a human presence is confirmed.
-- Triggers local hardware alarms and handles external data transmission over WiFi.
+* Blocks safely on a **FreeRTOS Semaphore** until a human presence is confirmed.
+* Triggers local hardware alarms and handles external data transmission over WiFi.
 
 ## Telemetry and Data Protocol
 
 The system utilizes a proprietary packet structure for seamless integration with external monitoring consoles or tactical dashboards.
 
 Upon positive detection, the system broadcasts via serial and wireless interfaces:
-
-
+`$TARA,ALERT,HUMAN_DETECTED,TIME:[ms_timestamp]`
 
 ## Repository Structure
 
+```text
 ├── ESP32.ino                  # Main entry point, FreeRTOS queue/task initialization
 ├── globals.h                  # Shared pin definitions and RTOS handles
 ├── radar_sensor.cpp / .h      # Hardware interfacing and 250Hz sampling task
@@ -65,22 +65,26 @@ Upon positive detection, the system broadcasts via serial and wireless interface
 ├── detection.cpp / .h         # Confidence algorithm and physiological matching task
 └── comms_ui.cpp / .h          # Local UI and WiFi telemetry task
 
+```
 
 ## Getting Started
 
 ### Prerequisites
 
 **Hardware**
-- ESP32 Development Board
-- HB100/CDM324 Radar Module
-- Active Low-Pass/Bandpass Circuit components
+
+* ESP32 Development Board
+* HB100/CDM324 Radar Module
+* Active Low-Pass/Bandpass Circuit components
 
 **Software**
-- Arduino IDE 2.x or PlatformIO
+
+* Arduino IDE 2.x or PlatformIO
 
 **Libraries**
-- arduinoFFT by Kosme (v2.0.0 or higher)
-- Standard ESP32 Board Package installed via Board Manager
+
+* `arduinoFFT` by Kosme (v2.0.0 or higher)
+* Standard ESP32 Board Package installed via Board Manager
 
 ### Installation and Setup
 
@@ -89,7 +93,8 @@ Upon positive detection, the system broadcasts via serial and wireless interface
 ```bash
 git clone https://github.com/yourusername/Through-Wall-Human-Detection.git
 cd Through-Wall-Human-Detection
-````
+
+```
 
 #### Hardware Wiring
 
@@ -114,6 +119,3 @@ cd Through-Wall-Human-Detection
 2. Verify system initialization messages and ensure the `rawDataQueue` is not dropping samples.
 3. Introduce a target subject in front of the radar obstacle.
 4. Monitor the **confidence level outputs** to confirm detection.
-
-```
-```
