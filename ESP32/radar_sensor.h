@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-// Function prototypes
+// Function prototypes to expose them to ESP32.ino
 void initRadar();
 void vRadarAcquisitionTask(void *pvParameters);
 

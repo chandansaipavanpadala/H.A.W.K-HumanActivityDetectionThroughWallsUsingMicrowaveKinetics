@@ -1,46 +1,56 @@
 #include "radar_sensor.h"
-#include "globals.h" // Includes our Queue handles and Pin definitions
+#include "globals.h" 
 
-// Define sampling parameters
-// 250 Hz sampling rate = 4 milliseconds per sample
+// --- Radar Sampling Parameters ---
+// To satisfy the Nyquist Theorem for human vitals (max 3Hz), 
+// a sampling rate of 250 Hz is excellent. 
+// 1000ms / 250Hz = 4ms period.
 #define SAMPLING_PERIOD_MS 4 
 
 void initRadar() {
-    // ESP32 default ADC resolution is 12-bit (values from 0 to 4095)
+    // Set ESP32 ADC to 12-bit resolution (values from 0 to 4095)
+    // This high resolution is critical for catching faint breathing ripples
     analogReadResolution(12);
     
-    // RADAR_ADC_PIN must be defined in globals.h (e.g., GPIO 34)
+    // RADAR_ADC_PIN is defined in globals.h
     pinMode(RADAR_ADC_PIN, INPUT);
     
-    Serial.println("Radar ADC initialized.");
+    Serial.println("SYS_INIT: Radar ADC Ready.");
 }
 
 void vRadarAcquisitionTask(void *pvParameters) {
-    // 1. Initialize hardware specific to this task
+    // 1. Initialize the ADC hardware
     initRadar();
 
-    // 2. Setup precise timing variables
+    // 2. Setup deterministic FreeRTOS timing
     TickType_t xLastWakeTime;
     const TickType_t xFrequency = pdMS_TO_TICKS(SAMPLING_PERIOD_MS);
 
-    // Initialize the xLastWakeTime variable with the current FreeRTOS tick count
+    // Get the initial tick count
     xLastWakeTime = xTaskGetTickCount();
 
     uint16_t adcValue = 0;
 
-    // 3. The infinite RTOS Task Loop
+    // 3. The Core Real-Time Loop
     for (;;) {
-        // Read the analog baseband signal from the HB100/CDM324
+        // Read the analog signal coming from your IF amplifier circuit
         adcValue = analogRead(RADAR_ADC_PIN);
 
-        // Send the raw data to the Signal Processing Task via the FreeRTOS Queue
-        // We use a timeout of '0' (non-blocking). Since this is the highest priority task, 
-        // we NEVER want it to wait if the queue is full. 
+        // Safely push the data to the queue
         if (rawDataQueue != NULL) {
-            xQueueSend(rawDataQueue, &adcValue, 0);
+            // The '0' timeout is crucial here. This is the highest priority task.
+            // If the queue is full (FFT task is lagging), we DO NOT wait. 
+            // We drop the sample and move on to maintain our strict 250Hz timing.
+            BaseType_t xStatus = xQueueSend(rawDataQueue, &adcValue, 0);
+            
+            if (xStatus != pdPASS) {
+                // If this prints often, you know your FFT task needs optimizing
+                Serial.println("ERR: rawDataQueue FULL! Sample dropped.");
+            }
         }
 
-        // Delay until the exact next 4ms interval to guarantee a perfect 250Hz sample rate
+        // 4. Sleep until the exact 4ms mark
+        // Unlike delay(), this accounts for the time it took to run analogRead()
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }

@@ -1,4 +1,8 @@
 #ifndef DETECTION_H
 #define DETECTION_H
+
+#include <Arduino.h>
+
 void vDetectionTask(void *pvParameters);
-#endif
+
+#endif // DETECTION_H
