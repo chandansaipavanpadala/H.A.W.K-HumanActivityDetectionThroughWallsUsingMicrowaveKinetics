@@ -1,4 +1,3 @@
-```markdown
 # Real-Time Through-Wall Human Detection System
 
 [![Platform](https://img.shields.io/badge/Platform-ESP32-blue.svg)](https://www.espressif.com/en/products/socs/esp32)
@@ -55,15 +54,9 @@ The system utilizes a proprietary packet structure for seamless integration with
 
 Upon positive detection, the system broadcasts via serial and wireless interfaces:
 
-```
 
-$TARA,ALERT,HUMAN_DETECTED,TIME:[ms_timestamp]
-
-```
 
 ## Repository Structure
-
-```
 
 ├── ESP32.ino                  # Main entry point, FreeRTOS queue/task initialization
 ├── globals.h                  # Shared pin definitions and RTOS handles
@@ -72,7 +65,6 @@ $TARA,ALERT,HUMAN_DETECTED,TIME:[ms_timestamp]
 ├── detection.cpp / .h         # Confidence algorithm and physiological matching task
 └── comms_ui.cpp / .h          # Local UI and WiFi telemetry task
 
-````
 
 ## Getting Started
 
