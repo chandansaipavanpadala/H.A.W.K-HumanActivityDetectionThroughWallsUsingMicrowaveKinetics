@@ -91,8 +91,8 @@ Upon positive detection, the system broadcasts via serial and wireless interface
 #### Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/Through-Wall-Human-Detection.git
-cd Through-Wall-Human-Detection
+git clone https://github.com/chandansaipavanpadala/H.A.W.K-HumanActivityDetectionThroughWallsUsingMicrowaveKinetics.git
+cd H.A.W.K-HumanActivityDetectionThroughWallsUsingMicrowaveKinetics
 
 ```
 
