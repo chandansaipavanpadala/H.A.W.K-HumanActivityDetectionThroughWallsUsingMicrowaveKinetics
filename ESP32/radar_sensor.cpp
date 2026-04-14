@@ -15,7 +15,7 @@ void initRadar() {
     // RADAR_ADC_PIN is defined in globals.h
     pinMode(RADAR_ADC_PIN, INPUT);
     
-    Serial.println("SYS_INIT: Radar ADC Ready.");
+    // Serial output removed — ADC init is silent
 }
 
 void vRadarAcquisitionTask(void *pvParameters) {
@@ -43,9 +43,15 @@ void vRadarAcquisitionTask(void *pvParameters) {
             // We drop the sample and move on to maintain our strict 250Hz timing.
             BaseType_t xStatus = xQueueSend(rawDataQueue, &adcValue, 0);
             
+            static uint32_t droppedSamples = 0;
             if (xStatus != pdPASS) {
-                // If this prints often, you know your FFT task needs optimizing
-                Serial.println("ERR: rawDataQueue FULL! Sample dropped.");
+                droppedSamples++;
+            }
+            // Report dropped samples every ~10 seconds to avoid Serial jitter
+            // Dropped sample reporting removed — eliminates UART jitter
+            // in the time-critical 250Hz sampling loop
+            if (droppedSamples > 0 && (xTaskGetTickCount() % pdMS_TO_TICKS(10000)) < xFrequency) {
+                droppedSamples = 0;
             }
         }
 
