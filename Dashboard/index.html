@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Project H.A.W.K. — Through-Wall Life Detection Radar Tactical Dashboard. Real-time monitoring console for ESP32 microwave kinetics system.">
+    <title>H.A.W.K. — Tactical Dashboard</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- ================================================================
+         LOADING OVERLAY
+         Shown on page load. Fades out when WebSocket connects.
+         Fades back in on disconnect.
+         ================================================================ -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-radar">
+                <div class="loading-radar__ring"></div>
+                <div class="loading-radar__ring loading-radar__ring--delay"></div>
+                <div class="loading-radar__sweep"></div>
+                <div class="loading-radar__dot"></div>
+            </div>
+            <h1 class="loading-title">H.A.W.K.</h1>
+            <p class="loading-subtitle">CONNECTING TO RADAR SYSTEM<span class="loading-dots"></span></p>
+            <p class="loading-status" id="loading-status">Establishing WebSocket uplink to 192.168.137.216:81</p>
+        </div>
+    </div>
+
+    <!-- ================================================================
+         CALIBRATION OVERLAY
+         Shown while the ESP32 is measuring the environmental noise floor.
+         Automatically hides when state transitions to ACTIVE.
+         ================================================================ -->
+    <div class="calibration-overlay hidden" id="calibration-overlay">
+        <div class="calibration-content">
+            <div class="calibration-icon">⚠</div>
+            <h2 class="calibration-title">ENVIRONMENTAL CALIBRATION</h2>
+            <p class="calibration-subtitle">IN PROGRESS</p>
+            <div class="calibration-warning">
+                PLEASE STAND CLEAR OF THE SENSOR
+            </div>
+            <div class="calibration-progress-track">
+                <div class="calibration-progress-bar" id="calibration-progress-bar"></div>
+            </div>
+            <p class="calibration-timer" id="calibration-timer">ANALYZING NOISE FLOOR — 15s REMAINING</p>
+        </div>
+    </div>
+
+    <!-- ================================================================
+         GRID BACKGROUND
+         ================================================================ -->
+    <div class="grid-bg" aria-hidden="true"></div>
+
+    <!-- ================================================================
+         MAIN DASHBOARD (hidden until WebSocket connects)
+         ================================================================ -->
+    <div class="dashboard" id="dashboard">
+
+        <!-- HEADER -->
+        <header class="header">
+            <div class="header__left">
+                <h1 class="header__codename">H.A.W.K.</h1>
+                <p class="header__subtitle">Human Activity Detection Through Walls Using Microwave Kinetics</p>
+            </div>
+            <div class="header__right">
+                <div class="header__connection" id="header-connection">
+                    <span class="connection-dot" id="connection-dot"></span>
+                    <span class="connection-label" id="connection-label">OFFLINE</span>
+                </div>
+                <div class="header__uptime" id="header-uptime">00:00:00</div>
+            </div>
+        </header>
+
+        <!-- TOP ROW: Status + Confidence + Stats -->
+        <div class="top-row">
+
+            <!-- STATUS INDICATOR -->
+            <section class="panel status-panel" id="status-panel">
+                <div class="panel__title">
+                    <span class="panel__dot"></span>
+                    Threat Assessment
+                </div>
+                <div class="status-display standby" id="status-display">
+                    <div class="status-display__icon" id="status-icon"></div>
+                    <div class="status-display__label" id="status-label">MONITORING</div>
+                    <div class="status-display__sublabel" id="status-sublabel">System standing by</div>
+                </div>
+            </section>
+
+            <!-- CONFIDENCE GAUGE -->
+            <section class="panel confidence-panel">
+                <div class="panel__title">
+                    <span class="panel__dot"></span>
+                    Confidence Level
+                </div>
+                <div class="confidence-gauge">
+                    <div class="confidence-bars" id="confidence-bars">
+                        <div class="confidence-bar" data-index="0"></div>
+                        <div class="confidence-bar" data-index="1"></div>
+                        <div class="confidence-bar" data-index="2"></div>
+                        <div class="confidence-bar" data-index="3"></div>
+                        <div class="confidence-bar" data-index="4"></div>
+                    </div>
+                    <div class="confidence-text">
+                        <span class="confidence-value" id="confidence-value">0</span>
+                        <span class="confidence-separator">/</span>
+                        <span class="confidence-max" id="confidence-max">5</span>
+                    </div>
+                    <div class="confidence-label" id="confidence-label">NO SIGNAL</div>
+                </div>
+            </section>
+
+            <!-- STATS CARDS -->
+            <section class="panel stats-panel">
+                <div class="panel__title">
+                    <span class="panel__dot"></span>
+                    System Metrics
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card__label">Total Alerts</div>
+                        <div class="stat-card__value stat-card__value--danger" id="stat-alerts">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Breathing Hz</div>
+                        <div class="stat-card__value stat-card__value--cyan" id="stat-breathing">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Heartbeat Hz</div>
+                        <div class="stat-card__value stat-card__value--magenta" id="stat-heartbeat">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Last Alert</div>
+                        <div class="stat-card__value stat-card__value--amber" id="stat-last-alert">—</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- CHARTS ROW -->
+        <div class="charts-row">
+            <section class="panel chart-panel">
+                <div class="panel__title">
+                    <span class="panel__dot panel__dot--cyan"></span>
+                    Breathing Frequency
+                    <span class="chart-band-label">0.2 – 0.5 Hz Band</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="breathing-chart"></canvas>
+                </div>
+            </section>
+            <section class="panel chart-panel">
+                <div class="panel__title">
+                    <span class="panel__dot panel__dot--magenta"></span>
+                    Heartbeat Frequency
+                    <span class="chart-band-label">1.0 – 2.5 Hz Band</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="heartbeat-chart"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <!-- EVENT LOG -->
+        <section class="panel log-panel">
+            <div class="panel__title">
+                <span class="panel__dot"></span>
+                Event Log
+                <button class="log-clear-btn" id="log-clear-btn" onclick="clearLog()">CLEAR</button>
+            </div>
+            <div class="log-container" id="log-container">
+                <div class="log-empty" id="log-empty">Awaiting telemetry . . .</div>
+            </div>
+        </section>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+            PROJECT H.A.W.K. &middot; THROUGH-WALL LIFE DETECTION RADAR &middot; CLASSIFIED
+        </footer>
+    </div>
+
+    <!-- Red Alert Vignette Overlay -->
+    <div class="vignette-overlay" id="vignette-overlay" aria-hidden="true"></div>
+
+    <!-- Application Logic -->
+    <script src="app.js"></script>
+
+</body>
+</html>
