@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────
 //  CONFIGURATION
 // ─────────────────────────────────────────────────
-const WEBSOCKET_URL = 'ws://192.168.137.91:81';
+let WEBSOCKET_URL = '';
 const MAX_CHART_POINTS = 30;       // Number of data points visible on each chart
 const RECONNECT_DELAY_MS = 3000;   // Time before auto-reconnect attempt
 const ALERT_DISPLAY_MS = 5000;     // How long RED ALERT stays on screen
@@ -652,5 +652,18 @@ function updateUptime() {
 // ─────────────────────────────────────────────────
 //  INITIALIZATION
 // ─────────────────────────────────────────────────
-addLogEntry('system', 'Dashboard initialized — establishing uplink');
-connect();
+document.getElementById('connect-btn').addEventListener('click', () => {
+    const inputVal = document.getElementById('ip-input').value.trim();
+    const userIP = inputVal ? inputVal : "192.168.137.207";
+    WEBSOCKET_URL = `ws://${userIP}:81`;
+    
+    document.getElementById('setup-overlay').classList.add('hidden');
+    addLogEntry('system', `Dashboard initialized — establishing uplink to ${userIP}`);
+    connect();
+});
+
+document.getElementById('ip-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        document.getElementById('connect-btn').click();
+    }
+});

@@ -20,11 +20,26 @@
 <body>
 
     <!-- ================================================================
+         SETUP OVERLAY
+         Shown initially to prompt the user for the IP address.
+         ================================================================ -->
+    <div class="loading-overlay" id="setup-overlay" style="z-index: 9500;">
+        <div class="loading-content">
+            <h1 class="loading-title">H.A.W.K.</h1>
+            <p class="loading-subtitle">ENTER ESP32 IP ADDRESS TO CONNECT</p>
+            <div style="margin-top:30px; display:flex; flex-direction:column; align-items:center; gap:15px;">
+                <input type="text" id="ip-input" value="192.168.137.207" style="background: rgba(0, 0, 0, 0.4); border: 1px solid #22d3ee; color: #e2e8f0; padding: 12px 16px; font-family: 'JetBrains Mono', monospace; font-size: 1rem; border-radius: 6px; width: 280px; text-align: center; outline: none; box-shadow: 0 0 10px rgba(34, 211, 238, 0.15);" autocomplete="off">
+                <button id="connect-btn" style="background: #22d3ee; color: #0a0e17; border: none; padding: 12px 24px; font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 0.9rem; border-radius: 6px; cursor: pointer; letter-spacing: 2px; width: 280px; box-shadow: 0 0 15px rgba(34, 211, 238, 0.4);">INITIALIZE UPLINK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================================================================
          LOADING OVERLAY
          Shown on page load. Fades out when WebSocket connects.
          Fades back in on disconnect.
          ================================================================ -->
-    <div class="loading-overlay" id="loading-overlay">
+    <div class="loading-overlay hidden" id="loading-overlay">
         <div class="loading-content">
             <div class="loading-radar">
                 <div class="loading-radar__ring"></div>
@@ -34,7 +49,7 @@
             </div>
             <h1 class="loading-title">H.A.W.K.</h1>
             <p class="loading-subtitle">CONNECTING TO RADAR SYSTEM<span class="loading-dots"></span></p>
-            <p class="loading-status" id="loading-status">Establishing WebSocket uplink to 192.168.137.216:81</p>
+            <p class="loading-status" id="loading-status">Awaiting IP configuration...</p>
         </div>
     </div>
 
