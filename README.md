@@ -330,7 +330,7 @@ All telemetry is transmitted exclusively over WebSocket (Serial output is disabl
 ### System Block Diagram
 
 <p align="center">
-  <img src="Screenshots/block.png" alt="System Block Diagram" width="700">
+  <img src="Screenshots/block.png" alt="System Block Diagram" width="700" style="background-color: white; padding: 16px; border-radius: 8px;">
 </p>
 
 Hierarchical tree diagram showing the 5 major subsystems of H.A.W.K.: **Target Environment** (human subject behind non-metallic barrier), **Microwave Doppler Radar** (10.525 GHz CW transmission, phase-shifted reflections, raw IF signal), **Analog Signal Conditioning Circuit** (LM358 dual op-amp, active bandpass filter, amplification & 1.65V DC bias), **Microcontroller Processing** (ESP32 with FreeRTOS — ADC sampling, 1024-pt FFT, peak detection, confidence algorithm), and **Output & Telemetry** (local buzzer/LED alarms, WebSocket server, tactical dashboard).
