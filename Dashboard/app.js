@@ -50,6 +50,14 @@ const dom = {
     statHeartbeat: document.getElementById('stat-heartbeat'),
     statLastAlert: document.getElementById('stat-last-alert'),
 
+    // New v2 stats
+    statBreathBPM: document.getElementById('stat-breath-bpm'),
+    statHeartBPM: document.getElementById('stat-heart-bpm'),
+    statRange: document.getElementById('stat-range'),
+    statNoiseFloor: document.getElementById('stat-noise-floor'),
+    statDetectDuration: document.getElementById('stat-detect-duration'),
+    statSignalStrength: document.getElementById('stat-signal-strength'),
+
     // Vignette
     vignette: document.getElementById('vignette-overlay'),
 
@@ -369,7 +377,7 @@ function parseHAWKMessage(raw) {
     }
 
     // ── Live Telemetry ──
-    // Format: $HAWK,DATA,breathFreq,heartFreq,breathMag,heartMag,confidence,maxConf,timestamp,state
+    // Format: $HAWK,DATA,breathFreq,heartFreq,breathMag,heartMag,confidence,maxConf,timestamp,state,breathBPM,heartBPM,estRange,noiseFloor,detectDur
     if (msgType === 'DATA' && parts.length >= 10) {
         const breathFreq = parseFloat(parts[2]);
         const heartFreq = parseFloat(parts[3]);
@@ -379,6 +387,13 @@ function parseHAWKMessage(raw) {
         const maxConf = parseInt(parts[7], 10);
         const espTime = parts[8];
         const systemState = parts[9];  // "CALIBRATING" or "ACTIVE"
+
+        // Parse new v2 fields (with fallback for older firmware)
+        const breathBPM = parts.length > 10 ? parseFloat(parts[10]) : breathFreq * 60;
+        const heartBPM = parts.length > 11 ? parseFloat(parts[11]) : heartFreq * 60;
+        const estRange = parts.length > 12 ? parseFloat(parts[12]) : -1;
+        const noiseFloor = parts.length > 13 ? parseFloat(parts[13]) : 0;
+        const detectDur = parts.length > 14 ? parseInt(parts[14], 10) : 0;
 
         // ── Handle calibration state ──
         if (systemState === 'CALIBRATING') {
@@ -401,14 +416,11 @@ function parseHAWKMessage(raw) {
         }
 
         // Ensure the dashboard is visible when receiving ACTIVE data.
-        // This also handles reconnect scenarios where the ESP32 already
-        // finished calibration and the dashboard was never revealed.
         if (!dom.dashboard.classList.contains('visible')) {
             dom.dashboard.classList.add('visible');
         }
 
         // ── Normal ACTIVE telemetry processing ──
-        // Build time label for chart x-axis
         const now = new Date();
         const timeLabel = now.toLocaleTimeString('en-US', {
             hour12: false,
@@ -421,19 +433,52 @@ function parseHAWKMessage(raw) {
         pushChartData(breathingChart, timeLabel, breathFreq);
         pushChartData(heartbeatChart, timeLabel, heartFreq);
 
-        // Update stat cards
+        // Update original stat cards
         dom.statBreathing.textContent = breathFreq.toFixed(3);
         dom.statHeartbeat.textContent = heartFreq.toFixed(3);
+
+        // Update new v2 stat cards
+        if (dom.statBreathBPM) {
+            dom.statBreathBPM.innerHTML = `${breathBPM.toFixed(1)} <span class="stat-card__unit">BPM</span>`;
+        }
+        if (dom.statHeartBPM) {
+            dom.statHeartBPM.innerHTML = `${heartBPM.toFixed(1)} <span class="stat-card__unit">BPM</span>`;
+        }
+        if (dom.statRange) {
+            if (estRange > 0) {
+                dom.statRange.innerHTML = `${estRange.toFixed(1)} <span class="stat-card__unit">m</span>`;
+            } else {
+                dom.statRange.innerHTML = `N/A <span class="stat-card__unit">m</span>`;
+            }
+        }
+        if (dom.statNoiseFloor) {
+            dom.statNoiseFloor.textContent = noiseFloor.toFixed(1);
+        }
+        if (dom.statDetectDuration) {
+            if (detectDur > 0) {
+                const durSec = Math.floor(detectDur / 1000);
+                const mm = String(Math.floor(durSec / 60)).padStart(2, '0');
+                const ss = String(durSec % 60).padStart(2, '0');
+                dom.statDetectDuration.textContent = `${mm}:${ss}`;
+            } else {
+                dom.statDetectDuration.textContent = '—';
+            }
+        }
+        if (dom.statSignalStrength) {
+            const maxMag = Math.max(breathMag, heartMag);
+            dom.statSignalStrength.textContent = maxMag.toFixed(1);
+        }
 
         // Update confidence gauge
         updateConfidence(confidence, maxConf);
 
         // Log telemetry
+        const rangeStr = estRange > 0 ? `${estRange.toFixed(1)}m` : 'N/A';
         addLogEntry('data',
-            `TELEM | Breath: ${breathFreq.toFixed(3)} Hz ` +
-            `| Heart: ${heartFreq.toFixed(3)} Hz ` +
-            `| Conf: ${confidence}/${maxConf} ` +
-            `| ESP: ${espTime} ms`
+            `TELEM | Breath: ${breathFreq.toFixed(3)} Hz (${breathBPM.toFixed(0)} BPM) ` +
+            `| Heart: ${heartFreq.toFixed(3)} Hz (${heartBPM.toFixed(0)} BPM) ` +
+            `| Range: ${rangeStr} ` +
+            `| Conf: ${confidence}/${maxConf}`
         );
         return;
     }

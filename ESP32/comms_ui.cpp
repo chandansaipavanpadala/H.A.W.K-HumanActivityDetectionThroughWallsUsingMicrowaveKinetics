@@ -83,7 +83,7 @@ void initCommsWiFi() {
 //     the TCP stack alive and handle ping/pong + new connections.
 //
 // Protocol sent over WebSocket:
-//   Telemetry:  $HAWK,DATA,<breathFreq>,<heartFreq>,<breathMag>,<heartMag>,<confidence>,<maxConf>,<timestamp>,<state>
+//   Telemetry:  $HAWK,DATA,<breathFreq>,<heartFreq>,<breathMag>,<heartMag>,<confidence>,<maxConf>,<timestamp>,<state>,<breathBPM>,<heartBPM>,<estRange>,<noiseFloor>,<detectDur>
 //   Alert:      $HAWK,ALERT,HUMAN_DETECTED,TIME:<timestamp>
 //   <state> is either "CALIBRATING" or "ACTIVE"
 // ---------------------------------------------------------------------
@@ -109,11 +109,11 @@ void vCommsUITask(void *pvParameters) {
         if (xQueueReceive(dashboardQueue, &telemetry, pdMS_TO_TICKS(50)) == pdTRUE) {
 
             // Build the $HAWK,DATA telemetry string for live graphs
-            // Format: $HAWK,DATA,breathFreq,heartFreq,breathMag,heartMag,confidence,maxConf,timestamp,state
+            // Format: $HAWK,DATA,breathFreq,heartFreq,breathMag,heartMag,confidence,maxConf,timestamp,state,breathBPM,heartBPM,estRange,noiseFloor,detectDur
             const char* stateStr = (telemetry.state == STATE_CALIBRATING) ? "CALIBRATING" : "ACTIVE";
-            char dataPacket[200];
+            char dataPacket[300];
             snprintf(dataPacket, sizeof(dataPacket),
-                     "$HAWK,DATA,%.3f,%.3f,%.1f,%.1f,%d,%d,%lu,%s",
+                     "$HAWK,DATA,%.3f,%.3f,%.1f,%.1f,%d,%d,%lu,%s,%.1f,%.1f,%.2f,%.1f,%lu",
                      telemetry.breathingFreq,
                      telemetry.heartbeatFreq,
                      telemetry.breathingMag,
@@ -121,7 +121,12 @@ void vCommsUITask(void *pvParameters) {
                      telemetry.confidenceLevel,
                      telemetry.maxConfidence,
                      millis(),
-                     stateStr);
+                     stateStr,
+                     telemetry.breathingBPM,
+                     telemetry.heartbeatBPM,
+                     telemetry.estimatedRange,
+                     telemetry.noiseFloor,
+                     telemetry.detectionDuration);
 
             // Serial output removed — data goes over WebSocket only
 

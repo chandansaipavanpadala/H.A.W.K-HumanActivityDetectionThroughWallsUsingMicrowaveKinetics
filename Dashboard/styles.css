@@ -733,6 +733,18 @@ body::after {
 .stat-card__value--amber   { color: var(--amber); }
 .stat-card__value--safe    { color: var(--green); }
 
+.stat-card__unit {
+    font-size: 0.65rem;
+    font-weight: 400;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+}
+
+/* Extended metrics row (BPM, Range, Detection Tracking) */
+.metrics-extended {
+    margin-bottom: 20px;
+}
+
 /* ====================================================================
    CHARTS ROW
    ==================================================================== */

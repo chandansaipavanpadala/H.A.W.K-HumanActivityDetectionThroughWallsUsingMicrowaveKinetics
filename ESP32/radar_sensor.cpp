@@ -41,18 +41,7 @@ void vRadarAcquisitionTask(void *pvParameters) {
             // The '0' timeout is crucial here. This is the highest priority task.
             // If the queue is full (FFT task is lagging), we DO NOT wait. 
             // We drop the sample and move on to maintain our strict 250Hz timing.
-            BaseType_t xStatus = xQueueSend(rawDataQueue, &adcValue, 0);
-            
-            static uint32_t droppedSamples = 0;
-            if (xStatus != pdPASS) {
-                droppedSamples++;
-            }
-            // Report dropped samples every ~10 seconds to avoid Serial jitter
-            // Dropped sample reporting removed — eliminates UART jitter
-            // in the time-critical 250Hz sampling loop
-            if (droppedSamples > 0 && (xTaskGetTickCount() % pdMS_TO_TICKS(10000)) < xFrequency) {
-                droppedSamples = 0;
-            }
+            xQueueSend(rawDataQueue, &adcValue, 0);
         }
 
         // 4. Sleep until the exact 4ms mark

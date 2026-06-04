@@ -170,7 +170,7 @@
                 <div class="panel__title">
                     <span class="panel__dot panel__dot--cyan"></span>
                     Breathing Frequency
-                    <span class="chart-band-label">0.2 – 0.5 Hz Band</span>
+                    <span class="chart-band-label">0.2 – 0.6 Hz Band</span>
                 </div>
                 <div class="chart-container">
                     <canvas id="breathing-chart"></canvas>
@@ -184,6 +184,60 @@
                 </div>
                 <div class="chart-container">
                     <canvas id="heartbeat-chart"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <!-- EXTENDED METRICS ROW -->
+        <div class="top-row metrics-extended">
+            <section class="panel stats-panel">
+                <div class="panel__title">
+                    <span class="panel__dot"></span>
+                    Vital Signs (BPM)
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card__label">Breathing Rate</div>
+                        <div class="stat-card__value stat-card__value--cyan" id="stat-breath-bpm">— <span class="stat-card__unit">BPM</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Heart Rate</div>
+                        <div class="stat-card__value stat-card__value--magenta" id="stat-heart-bpm">— <span class="stat-card__unit">BPM</span></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel stats-panel">
+                <div class="panel__title">
+                    <span class="panel__dot"></span>
+                    Range & Environment
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card__label">Estimated Range</div>
+                        <div class="stat-card__value stat-card__value--safe" id="stat-range">— <span class="stat-card__unit">m</span></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Noise Floor</div>
+                        <div class="stat-card__value stat-card__value--amber" id="stat-noise-floor">—</div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel stats-panel">
+                <div class="panel__title">
+                    <span class="panel__dot"></span>
+                    Detection Tracking
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card__label">Detection Duration</div>
+                        <div class="stat-card__value stat-card__value--danger" id="stat-detect-duration">—</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card__label">Signal Strength</div>
+                        <div class="stat-card__value stat-card__value--cyan" id="stat-signal-strength">—</div>
+                    </div>
                 </div>
             </section>
         </div>
