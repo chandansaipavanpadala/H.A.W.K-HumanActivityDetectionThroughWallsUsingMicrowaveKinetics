@@ -475,9 +475,6 @@ H.A.W.K/
 |   +-- streng.png                     # Barrier material degradation chart
 |   +-- wavedrom.png                   # RTOS scheduling timeline
 |
-+-- Paper/                             # IEEE paper and MATLAB scripts
-+-- BEL/                               # Presentation materials
-+-- Trash/                             # Archived development notes
 +-- LICENSE                            # MIT License
 +-- README.md                          # This file
 ```

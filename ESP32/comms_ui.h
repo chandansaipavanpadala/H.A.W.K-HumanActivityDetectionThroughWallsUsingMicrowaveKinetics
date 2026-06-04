@@ -6,10 +6,9 @@
 #include "globals.h"
 
 // --- WiFi Configuration ---
-// ⚠ IMPORTANT: Change these to match your local network before flashing.
-// Do NOT commit real credentials to a public repository.
-#define WIFI_SSID     "YOUR_WIFI_SSID"
-#define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+// Change these to match your local network before flashing.
+#define WIFI_SSID     "ChAnDaN"
+#define WIFI_PASSWORD "PCSp@112"
 
 // --- Dashboard Telemetry Structure ---
 // Sent from the Detection Task to CommsUI on every FFT cycle.
