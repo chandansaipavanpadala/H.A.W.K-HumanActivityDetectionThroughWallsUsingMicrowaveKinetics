@@ -83,9 +83,10 @@ void initCommsWiFi() {
 //     the TCP stack alive and handle ping/pong + new connections.
 //
 // Protocol sent over WebSocket:
-//   Telemetry:  $HAWK,DATA,<breathFreq>,<heartFreq>,<breathMag>,<heartMag>,<confidence>,<maxConf>,<timestamp>,<state>,<breathBPM>,<heartBPM>,<estRange>,<noiseFloor>,<detectDur>
+//   Telemetry:  $HAWK,DATA,<breathFreq>,<heartFreq>,<breathMag>,<heartMag>,<confidence>,<maxConf>,<timestamp>,<state>,<noiseFloor>
 //   Alert:      $HAWK,ALERT,HUMAN_DETECTED,TIME:<timestamp>
 //   <state> is either "CALIBRATING" or "ACTIVE"
+//   BPM, distance, and detection duration are computed client-side.
 // ---------------------------------------------------------------------
 void vCommsUITask(void *pvParameters) {
     // 1. Initialize local hardware
@@ -108,12 +109,12 @@ void vCommsUITask(void *pvParameters) {
         // ---- B.  Check for new telemetry from the Detection Task ----
         if (xQueueReceive(dashboardQueue, &telemetry, pdMS_TO_TICKS(50)) == pdTRUE) {
 
-            // Build the $HAWK,DATA telemetry string for live graphs
-            // Format: $HAWK,DATA,breathFreq,heartFreq,breathMag,heartMag,confidence,maxConf,timestamp,state,breathBPM,heartBPM,estRange,noiseFloor,detectDur
+            // Build the $HAWK,DATA telemetry string (raw data only)
+            // Format: $HAWK,DATA,breathFreq,heartFreq,breathMag,heartMag,confidence,maxConf,timestamp,state,noiseFloor
             const char* stateStr = (telemetry.state == STATE_CALIBRATING) ? "CALIBRATING" : "ACTIVE";
-            char dataPacket[300];
+            char dataPacket[200];
             snprintf(dataPacket, sizeof(dataPacket),
-                     "$HAWK,DATA,%.3f,%.3f,%.1f,%.1f,%d,%d,%lu,%s,%.1f,%.1f,%.2f,%.1f,%lu",
+                     "$HAWK,DATA,%.3f,%.3f,%.1f,%.1f,%d,%d,%lu,%s,%.1f",
                      telemetry.breathingFreq,
                      telemetry.heartbeatFreq,
                      telemetry.breathingMag,
@@ -122,11 +123,7 @@ void vCommsUITask(void *pvParameters) {
                      telemetry.maxConfidence,
                      millis(),
                      stateStr,
-                     telemetry.breathingBPM,
-                     telemetry.heartbeatBPM,
-                     telemetry.estimatedRange,
-                     telemetry.noiseFloor,
-                     telemetry.detectionDuration);
+                     telemetry.noiseFloor);
 
             // Serial output removed — data goes over WebSocket only
 

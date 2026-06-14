@@ -14,23 +14,9 @@
 // =============================================================================
 const int   REQUIRED_CONFIDENCE    = 5;
 const float FALLBACK_THRESHOLD     = 50.0f;
-const float SAFETY_MARGIN          = 1.5f;
+const float SAFETY_MARGIN          = 1.3f;   // Tuned for LM358 noise (was 1.5)
 const int   CONFIDENCE_DECAY       = 1;
 const int   POST_ALERT_CONFIDENCE  = 3;
-
-// =============================================================================
-// Distance Estimation Constants (Empirical Power-Law Fit)
-// =============================================================================
-// From magdis.png data: magnitude ≈ A / (distance ^ n)
-// Fitted from empirical measurements through drywall:
-//   0.5m → 0.97,  1.0m → 0.68,  1.5m → 0.33,  2.0m → 0.27,  2.5m → 0.12
-// Solving: A ≈ 0.55, n ≈ 1.8
-// Inverse: distance ≈ (A / magnitude) ^ (1/n)
-// =============================================================================
-const float DIST_COEFF_A = 0.55f;    // Amplitude coefficient
-const float DIST_EXPONENT_N = 1.8f;  // Decay exponent
-const float DIST_MAX_RANGE = 5.0f;   // Clamp maximum reported distance (meters)
-const float DIST_MIN_RANGE = 0.2f;   // Clamp minimum reported distance (meters)
 
 // Calibration sample buffer for percentile calculation
 #define CALIB_MAX_SAMPLES 20  // ~3-4 FFT cycles in 15 seconds
@@ -39,42 +25,15 @@ const float DIST_MIN_RANGE = 0.2f;   // Clamp minimum reported distance (meters)
 // Detection Task — with 15-second Auto-Calibration Startup
 // =============================================================================
 // Phase 1 (CALIBRATING):
-//   - Runs for exactly CALIBRATION_DURATION_MS (15 s) after boot.
-//   - The FFT pipeline runs normally, but the task does NOT look for humans.
-//   - Instead it collects magnitude samples into a buffer for statistical
-//     analysis (75th percentile), rejecting outlier spikes.
-//   - Telemetry is still sent so the dashboard can show live data.
-//   - At the end:  activeThreshold = P75(noise) * SAFETY_MARGIN
+//   Runs for CALIBRATION_DURATION_MS (15 s). Collects noise samples,
+//   computes 75th percentile → activeThreshold = P75 * SAFETY_MARGIN.
 //
 // Phase 2 (ACTIVE):
-//   - Normal human detection with the dynamically calibrated threshold.
-//   - Confidence ramp-up/decay and alert logic as before.
+//   Detection with dynamically calibrated threshold + confidence logic.
 //
-// IMPORTANT: No blocking delay() is used for the 15-second window.
-//   We use xTaskGetTickCount() comparisons so the task keeps consuming
-//   the processedDataQueue and feeding telemetry to the dashboard.
+// NOTE: BPM, distance estimation, and detection duration are computed
+// on the Dashboard (client-side) to reduce ESP32 workload.
 // =============================================================================
-// Helper: estimate distance from FFT magnitude using inverse power law
-static float estimateDistance(float magnitude, float noiseFloor) {
-    // Only estimate if magnitude is meaningfully above noise floor
-    if (magnitude <= noiseFloor || magnitude <= 0.0f) {
-        return -1.0f;  // Cannot estimate — signal too weak
-    }
-    // Normalize magnitude relative to noise floor
-    float netMag = magnitude - noiseFloor;
-    if (netMag <= 0.01f) return -1.0f;
-
-    // distance = (A / netMag) ^ (1/n)
-    float ratio = DIST_COEFF_A / netMag;
-    if (ratio <= 0.0f) return DIST_MIN_RANGE;
-
-    float distance = powf(ratio, 1.0f / DIST_EXPONENT_N);
-
-    // Clamp to valid range
-    if (distance < DIST_MIN_RANGE) distance = DIST_MIN_RANGE;
-    if (distance > DIST_MAX_RANGE) distance = DIST_MAX_RANGE;
-    return distance;
-}
 
 void vDetectionTask(void *pvParameters) {
     VitalSignData vitals;
@@ -82,18 +41,32 @@ void vDetectionTask(void *pvParameters) {
 
     // --- Calibration state ---
     TickType_t calibrationStartTick = xTaskGetTickCount();
-    float calibSamples[CALIB_MAX_SAMPLES];  // Buffer for percentile calculation
+    float calibSamples[CALIB_MAX_SAMPLES];
     int calibSampleCount = 0;
     bool calibrationComplete = false;
 
-    // --- Detection duration tracking ---
-    bool humanCurrentlyDetected = false;
-    TickType_t detectionStartTick = 0;
-    unsigned long detectionDurationMs = 0;
+    // --- EMA (Exponential Moving Average) smoothing ---
+    // Smooths FFT magnitudes across cycles to reduce noise variance.
+    // Alpha = 0.3 means each new reading contributes 30%, history 70%.
+    // This gives ~√3 effective noise reduction while tracking real signals.
+    const float EMA_ALPHA = 0.3f;
+    float smoothBreathMag = 0.0f;
+    float smoothHeartMag = 0.0f;
+    bool emaInitialized = false;
 
     for (;;) {
         // Wait indefinitely for the FFT task to send processed vital sign data
         if (xQueueReceive(processedDataQueue, &vitals, portMAX_DELAY) == pdPASS) {
+
+            // Apply EMA smoothing to magnitudes
+            if (!emaInitialized) {
+                smoothBreathMag = vitals.breathingMag;
+                smoothHeartMag  = vitals.heartbeatMag;
+                emaInitialized = true;
+            } else {
+                smoothBreathMag = EMA_ALPHA * vitals.breathingMag + (1.0f - EMA_ALPHA) * smoothBreathMag;
+                smoothHeartMag  = EMA_ALPHA * vitals.heartbeatMag + (1.0f - EMA_ALPHA) * smoothHeartMag;
+            }
 
             // =============================================================
             //  PHASE 1: CALIBRATION  (first 15 seconds after boot)
@@ -101,7 +74,7 @@ void vDetectionTask(void *pvParameters) {
             if (!calibrationComplete) {
 
                 // Record the max magnitude of both bands for this FFT cycle
-                float cyclePeak = max(vitals.breathingMag, vitals.heartbeatMag);
+                float cyclePeak = max(smoothBreathMag, smoothHeartMag);
                 if (calibSampleCount < CALIB_MAX_SAMPLES) {
                     calibSamples[calibSampleCount++] = cyclePeak;
                 }
@@ -134,22 +107,17 @@ void vDetectionTask(void *pvParameters) {
                     calibrationComplete = true;
                 }
 
-                // Send telemetry during calibration so the dashboard shows
-                // live data (the state field tells the UI we're still calibrating)
+                // Send telemetry during calibration (use smoothed values)
                 DashboardTelemetry telem;
-                telem.breathingFreq    = vitals.breathingFreq;
-                telem.heartbeatFreq    = vitals.heartbeatFreq;
-                telem.breathingMag     = vitals.breathingMag;
-                telem.heartbeatMag     = vitals.heartbeatMag;
-                telem.confidenceLevel  = 0;
-                telem.maxConfidence    = REQUIRED_CONFIDENCE;
-                telem.alertTriggered   = false;
-                telem.state            = STATE_CALIBRATING;
-                telem.breathingBPM     = 0.0f;
-                telem.heartbeatBPM     = 0.0f;
-                telem.estimatedRange   = -1.0f;
-                telem.noiseFloor       = 0.0f;
-                telem.detectionDuration = 0;
+                telem.breathingFreq   = vitals.breathingFreq;
+                telem.heartbeatFreq   = vitals.heartbeatFreq;
+                telem.breathingMag    = smoothBreathMag;
+                telem.heartbeatMag    = smoothHeartMag;
+                telem.confidenceLevel = 0;
+                telem.maxConfidence   = REQUIRED_CONFIDENCE;
+                telem.alertTriggered  = false;
+                telem.state           = STATE_CALIBRATING;
+                telem.noiseFloor      = 0.0f;
                 xQueueSend(dashboardQueue, &telem, 0);
 
                 // Skip all detection logic during calibration
@@ -160,10 +128,10 @@ void vDetectionTask(void *pvParameters) {
             //  PHASE 2: ACTIVE DETECTION  (normal operation)
             // =============================================================
 
-            // A reading is positive if EITHER vital band exceeds the
-            // dynamically calibrated noise threshold
-            bool breathingDetected = (vitals.breathingMag > activeThreshold);
-            bool heartbeatDetected = (vitals.heartbeatMag > activeThreshold);
+            // Use SMOOTHED magnitudes for detection (less susceptible to
+            // single-cycle noise spikes that cause false positives)
+            bool breathingDetected = (smoothBreathMag > activeThreshold);
+            bool heartbeatDetected = (smoothHeartMag > activeThreshold);
             bool isHumanPresent = breathingDetected || heartbeatDetected;
 
             if (isHumanPresent) {
@@ -171,59 +139,29 @@ void vDetectionTask(void *pvParameters) {
                 if (confidenceLevel > REQUIRED_CONFIDENCE) {
                     confidenceLevel = REQUIRED_CONFIDENCE;
                 }
-                // Track detection duration
-                if (!humanCurrentlyDetected) {
-                    humanCurrentlyDetected = true;
-                    detectionStartTick = xTaskGetTickCount();
-                }
-                detectionDurationMs = (xTaskGetTickCount() - detectionStartTick) * portTICK_PERIOD_MS;
             } else {
-                // Decay confidence (reduced from −2 to −1 so slow
-                // breathers can still reach confirmation)
                 confidenceLevel -= CONFIDENCE_DECAY;
-                if (confidenceLevel < 0) {
-                    confidenceLevel = 0;
-                }
-                // Reset detection tracking if confidence drops to zero
-                if (confidenceLevel == 0) {
-                    humanCurrentlyDetected = false;
-                    detectionDurationMs = 0;
-                }
+                if (confidenceLevel < 0) confidenceLevel = 0;
             }
 
-            // --- Compute BPM values ---
-            float breathBPM = vitals.breathingFreq * 60.0f;  // Breaths per minute
-            float heartBPM  = vitals.heartbeatFreq * 60.0f;  // Beats per minute
-
-            // --- Estimate distance from signal strength ---
-            float maxVitalMag = max(vitals.breathingMag, vitals.heartbeatMag);
-            float estimatedDist = estimateDistance(maxVitalMag, activeThreshold / SAFETY_MARGIN);
-
-            // --- Build and send dashboard telemetry for EVERY FFT cycle ---
+            // --- Build and send telemetry (raw data only) ---
             bool alertFired = false;
-
             if (confidenceLevel >= REQUIRED_CONFIDENCE) {
                 alertFired = true;
                 xSemaphoreGive(detectionSemaphore);
-                // Reset to POST_ALERT_CONFIDENCE (3) instead of 0
-                // so re-acquisition only needs 2 more positive cycles (~8s)
                 confidenceLevel = POST_ALERT_CONFIDENCE;
             }
 
             DashboardTelemetry telem;
-            telem.breathingFreq    = vitals.breathingFreq;
-            telem.heartbeatFreq    = vitals.heartbeatFreq;
-            telem.breathingMag     = vitals.breathingMag;
-            telem.heartbeatMag     = vitals.heartbeatMag;
-            telem.confidenceLevel  = confidenceLevel;
-            telem.maxConfidence    = REQUIRED_CONFIDENCE;
-            telem.alertTriggered   = alertFired;
-            telem.state            = STATE_ACTIVE;
-            telem.breathingBPM     = breathBPM;
-            telem.heartbeatBPM     = heartBPM;
-            telem.estimatedRange   = estimatedDist;
-            telem.noiseFloor       = activeThreshold / SAFETY_MARGIN;
-            telem.detectionDuration = detectionDurationMs;
+            telem.breathingFreq   = vitals.breathingFreq;
+            telem.heartbeatFreq   = vitals.heartbeatFreq;
+            telem.breathingMag    = smoothBreathMag;
+            telem.heartbeatMag    = smoothHeartMag;
+            telem.confidenceLevel = confidenceLevel;
+            telem.maxConfidence   = REQUIRED_CONFIDENCE;
+            telem.alertTriggered  = alertFired;
+            telem.state           = STATE_ACTIVE;
+            telem.noiseFloor      = activeThreshold / SAFETY_MARGIN;
 
             xQueueSend(dashboardQueue, &telem, 0);
 

@@ -1,6 +1,6 @@
 LTspice 24.0.12 for Windows
 Circuit: * P:\OneDrive - Amrita vishwa vidyapeetham\ASEB\B.Tech\3rd Year\6th Semester\Real Time Operating Systems\Project\LTspice\HB100-ESP32.asc
-Start Time: Wed Apr  8 15:21:22 2026
+Start Time: Sat Jun 13 09:44:04 2026
 solver = Normal
 Maximum thread count: 8
 tnom = 27
@@ -31,5 +31,5 @@ Gmin = 1.33182e-13
 Gmin = 0
 Gmin stepping succeeded in finding the operating point.
 
-Total elapsed time: 0.290 seconds.
+Total elapsed time: 0.124 seconds.
 

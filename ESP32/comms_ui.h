@@ -12,7 +12,7 @@
 
 // --- Dashboard Telemetry Structure ---
 // Sent from the Detection Task to CommsUI on every FFT cycle.
-// This carries the FULL system state for the dashboard to render.
+// Only raw data — BPM, distance, duration are computed client-side.
 struct DashboardTelemetry {
     float breathingFreq;       // Breathing peak frequency (Hz)
     float heartbeatFreq;       // Heartbeat peak frequency (Hz)
@@ -22,12 +22,7 @@ struct DashboardTelemetry {
     int   maxConfidence;       // Value of REQUIRED_CONFIDENCE (so the dashboard knows the scale)
     bool  alertTriggered;      // True if this cycle caused a confirmed detection
     SystemState state;         // Current system state (CALIBRATING or ACTIVE)
-    // --- New fields (v2) ---
-    float breathingBPM;        // Breathing rate in breaths per minute (freq × 60)
-    float heartbeatBPM;        // Heart rate in beats per minute (freq × 60)
-    float estimatedRange;      // Estimated distance to target in meters (-1 = unknown)
-    float noiseFloor;          // Current noise floor magnitude (for dashboard monitoring)
-    unsigned long detectionDuration;  // How long a human has been continuously detected (ms)
+    float noiseFloor;          // Current noise floor magnitude (for dashboard computations)
 };
 
 // --- FreeRTOS Queue for Dashboard Telemetry ---
