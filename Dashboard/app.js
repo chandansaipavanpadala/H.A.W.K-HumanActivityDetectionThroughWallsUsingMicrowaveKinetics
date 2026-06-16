@@ -386,7 +386,7 @@ function parseHAWKMessage(raw) {
     }
 
     // ── Live Telemetry ──
-    // Format: $HAWK,DATA,breathFreq,heartFreq,breathMag,heartMag,confidence,maxConf,timestamp,state,noiseFloor
+    // Format: $HAWK,DATA,breathFreq,heartFreq,breathMag,heartMag,confidence,maxConf,timestamp,state,scoreA,scoreB,scoreC,fusedScore
     if (msgType === 'DATA' && parts.length >= 10) {
         const breathFreq = parseFloat(parts[2]);
         const heartFreq = parseFloat(parts[3]);
@@ -396,23 +396,24 @@ function parseHAWKMessage(raw) {
         const maxConf = parseInt(parts[7], 10);
         const espTime = parts[8];
         const systemState = parts[9];  // "CALIBRATING" or "ACTIVE"
-        const noiseFloor = parts.length > 10 ? parseFloat(parts[10]) : 0;
+
+        // Parse hybrid detection scores (with fallback for older firmware)
+        const scoreA = parts.length > 10 ? parseFloat(parts[10]) : 0;
+        const scoreB = parts.length > 11 ? parseFloat(parts[11]) : 0;
+        const scoreC = parts.length > 12 ? parseFloat(parts[12]) : 0;
+        const fusedScore = parts.length > 13 ? parseFloat(parts[13]) : 0;
 
         // ── Client-side computed metrics ──
         const breathBPM = breathFreq * 60;
         const heartBPM = heartFreq * 60;
 
-        // Distance estimation (SNR-based, moved from ESP32)
+        // Distance estimation (based on fused score as proxy for signal strength)
         let estRange = -1;
-        if (noiseFloor > 0) {
-            const maxMag = Math.max(breathMag, heartMag);
-            const snr = maxMag / noiseFloor;
-            if (snr > 1.1) {
-                const netSNR = snr - 1.0;
-                estRange = DIST_SCALE / Math.pow(netSNR, DIST_EXPONENT);
-                if (estRange < DIST_MIN_CM) estRange = DIST_MIN_CM;
-                if (estRange > DIST_MAX_CM) estRange = DIST_MAX_CM;
-            }
+        if (fusedScore > 0.1) {
+            // Higher fused score = closer target
+            estRange = DIST_SCALE / Math.pow(fusedScore * 3.0, DIST_EXPONENT);
+            if (estRange < DIST_MIN_CM) estRange = DIST_MIN_CM;
+            if (estRange > DIST_MAX_CM) estRange = DIST_MAX_CM;
         }
 
         // Detection duration tracking (client-side)
@@ -480,7 +481,8 @@ function parseHAWKMessage(raw) {
             }
         }
         if (dom.statNoiseFloor) {
-            dom.statNoiseFloor.textContent = noiseFloor.toFixed(1);
+            // Show the fused score (0–1) as the primary detection metric
+            dom.statNoiseFloor.textContent = fusedScore.toFixed(3);
         }
         if (dom.statDetectDuration) {
             if (detectDurMs > 0) {
@@ -505,7 +507,7 @@ function parseHAWKMessage(raw) {
         addLogEntry('data',
             `TELEM | Breath: ${breathFreq.toFixed(3)} Hz (${breathBPM.toFixed(0)} BPM) ` +
             `| Heart: ${heartFreq.toFixed(3)} Hz (${heartBPM.toFixed(0)} BPM) ` +
-            `| Range: ${rangeStr} ` +
+            `| Fused: ${fusedScore.toFixed(2)} [A:${scoreA.toFixed(2)} B:${scoreB.toFixed(2)} C:${scoreC.toFixed(2)}] ` +
             `| Conf: ${confidence}/${maxConf}`
         );
         return;

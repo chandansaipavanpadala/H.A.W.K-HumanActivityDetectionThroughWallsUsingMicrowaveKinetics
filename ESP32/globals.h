@@ -27,15 +27,10 @@ enum SystemState {
 extern volatile SystemState systemState;
 
 // =============================================================================
-// Dynamic Noise Floor Threshold
+// FFT Configuration
 // =============================================================================
-// During calibration the Detection Task records the highest FFT magnitude
-// observed across both vital-sign bands.  At the end of calibration:
-//   activeThreshold = peakNoiseMagnitude * 1.5
-// This replaces the old hardcoded MIN_MAGNITUDE_THRESHOLD.
-// Fallback value of 50.0 is used if calibration sees zero signal (dead ADC).
-// =============================================================================
-extern float activeThreshold;
+#define FFT_SIZE 1024              // 1024-point FFT
+#define FFT_VITAL_BINS 13          // Bins 0–12 cover 0–3 Hz (vital sign range)
 
 // Duration of the startup calibration window (milliseconds)
 #define CALIBRATION_DURATION_MS 15000
@@ -43,10 +38,11 @@ extern float activeThreshold;
 // --- Vital Sign Data Structure ---
 // Passed from Signal Processing Task to Detection Task via processedDataQueue
 struct VitalSignData {
-    float breathingFreq;    // Peak frequency in the 0.2 - 0.6 Hz band
-    float heartbeatFreq;    // Peak frequency in the 1.0 - 2.5 Hz band
-    float breathingMag;     // FFT magnitude of the breathing peak (signal strength)
-    float heartbeatMag;     // FFT magnitude of the heartbeat peak (signal strength)
+    float breathingFreq;                  // Peak frequency in the 0.2 - 0.6 Hz band
+    float heartbeatFreq;                  // Peak frequency in the 1.0 - 2.5 Hz band
+    float breathingMag;                   // FFT magnitude of the breathing peak
+    float heartbeatMag;                   // FFT magnitude of the heartbeat peak
+    float magnitudes[FFT_VITAL_BINS];     // Full FFT magnitude array for bins 0–12
 };
 
 // --- FreeRTOS Handles ---

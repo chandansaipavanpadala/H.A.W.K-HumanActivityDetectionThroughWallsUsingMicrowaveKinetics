@@ -1,6 +1,7 @@
 #include "signal_processing.h"
 #include "globals.h"
 #include "arduinoFFT.h"
+#include <string.h>
 
 // =============================================================================
 // FFT Configuration for 1024-Point Transform
@@ -128,8 +129,14 @@ void vSignalProcessingTask(void *pvParameters) {
                 FFT.compute(vReal, vImag, SAMPLES, FFT_FORWARD);
                 FFT.complexToMagnitude(vReal, vImag, SAMPLES);
 
+                // Kill residual DC leakage in bin 0.
+                // Even after dcRemoval + Hamming, spectral leakage leaves a
+                // large value in bin 0 that would poison the detection engine.
+                vReal[0] = 0.0f;
+
                 // 3. Extract vital signs from specific frequency sub-bands
                 VitalSignData vitals;
+                memset(&vitals, 0, sizeof(vitals));  // Zero all fields including magnitudes[]
                 int halfBins = SAMPLES / 2;  // Only first half of FFT is meaningful
 
                 vitals.breathingFreq = findSubBandPeak(
@@ -141,6 +148,12 @@ void vSignalProcessingTask(void *pvParameters) {
                     vReal, HEARTBEAT_BIN_START, HEARTBEAT_BIN_END,
                     halfBins, &vitals.heartbeatMag, FREQ_RESOLUTION
                 );
+
+                // 3b. Copy the vital-sign FFT bins (0–12) for the hybrid
+                //     detection engine's per-bin spectral analysis
+                for (int b = 0; b < FFT_VITAL_BINS && b < halfBins; b++) {
+                    vitals.magnitudes[b] = vReal[b];
+                }
 
                 // 4. Send the dual-band result to the Detection Task
                 xQueueSend(processedDataQueue, &vitals, 0);

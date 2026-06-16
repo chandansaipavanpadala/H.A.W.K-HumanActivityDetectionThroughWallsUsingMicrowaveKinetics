@@ -109,12 +109,12 @@ void vCommsUITask(void *pvParameters) {
         // ---- B.  Check for new telemetry from the Detection Task ----
         if (xQueueReceive(dashboardQueue, &telemetry, pdMS_TO_TICKS(50)) == pdTRUE) {
 
-            // Build the $HAWK,DATA telemetry string (raw data only)
-            // Format: $HAWK,DATA,breathFreq,heartFreq,breathMag,heartMag,confidence,maxConf,timestamp,state,noiseFloor
+            // Build the $HAWK,DATA telemetry string (includes hybrid scores)
+            // Format: $HAWK,DATA,breathFreq,heartFreq,breathMag,heartMag,confidence,maxConf,timestamp,state,scoreA,scoreB,scoreC,fusedScore
             const char* stateStr = (telemetry.state == STATE_CALIBRATING) ? "CALIBRATING" : "ACTIVE";
-            char dataPacket[200];
+            char dataPacket[256];
             snprintf(dataPacket, sizeof(dataPacket),
-                     "$HAWK,DATA,%.3f,%.3f,%.1f,%.1f,%d,%d,%lu,%s,%.1f",
+                     "$HAWK,DATA,%.3f,%.3f,%.1f,%.1f,%d,%d,%lu,%s,%.3f,%.3f,%.3f,%.3f",
                      telemetry.breathingFreq,
                      telemetry.heartbeatFreq,
                      telemetry.breathingMag,
@@ -123,7 +123,10 @@ void vCommsUITask(void *pvParameters) {
                      telemetry.maxConfidence,
                      millis(),
                      stateStr,
-                     telemetry.noiseFloor);
+                     telemetry.scoreA,
+                     telemetry.scoreB,
+                     telemetry.scoreC,
+                     telemetry.fusedScore);
 
             // Serial output removed — data goes over WebSocket only
 

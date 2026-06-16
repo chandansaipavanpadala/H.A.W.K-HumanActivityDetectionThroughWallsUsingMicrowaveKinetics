@@ -12,17 +12,20 @@
 
 // --- Dashboard Telemetry Structure ---
 // Sent from the Detection Task to CommsUI on every FFT cycle.
-// Only raw data — BPM, distance, duration are computed client-side.
+// Includes raw vital data + hybrid detection engine scores.
 struct DashboardTelemetry {
     float breathingFreq;       // Breathing peak frequency (Hz)
     float heartbeatFreq;       // Heartbeat peak frequency (Hz)
     float breathingMag;        // Breathing FFT magnitude
     float heartbeatMag;        // Heartbeat FFT magnitude
-    int   confidenceLevel;     // Current detection confidence (0 to REQUIRED_CONFIDENCE)
-    int   maxConfidence;       // Value of REQUIRED_CONFIDENCE (so the dashboard knows the scale)
+    int   confidenceLevel;     // Current detection confidence (0 to maxConfidence)
+    int   maxConfidence;       // Maximum confidence scale
     bool  alertTriggered;      // True if this cycle caused a confirmed detection
     SystemState state;         // Current system state (CALIBRATING or ACTIVE)
-    float noiseFloor;          // Current noise floor magnitude (for dashboard computations)
+    float scoreA;              // Method A: spectral comparison score (0–1)
+    float scoreB;              // Method B: EMA adaptive floor score (0–1)
+    float scoreC;              // Method C: differential score (0–1)
+    float fusedScore;          // Weighted fusion of A+B+C (0–1)
 };
 
 // --- FreeRTOS Queue for Dashboard Telemetry ---
